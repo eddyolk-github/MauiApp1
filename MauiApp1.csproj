@@ -19,6 +19,13 @@
 		<SingleProject>true</SingleProject>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
+		
+		<!-- Enable unit testing -->
+		<IsTestProject>false</IsTestProject>
+		<GenerateTestingPlatformEntryPoint>false</GenerateTestingPlatformEntryPoint>
+		
+		<!-- Fix multiple entry points for MacCatalyst -->
+		<StartupObject Condition="'$(TargetFramework)' == 'net9.0-maccatalyst'">MauiApp1.Program</StartupObject>
 
 		<!-- Display name -->
 		<ApplicationTitle>MauiApp1</ApplicationTitle>
@@ -62,6 +69,15 @@
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.5" />
+		<PackageReference Include="xunit" Version="2.9.0" />
+		<PackageReference Include="xunit.runner.visualstudio" Version="3.0.0" />
+		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<!-- Exclude test files from the main application build -->
+		<Compile Remove="Tests\**\*.cs" />
+		<None Include="Tests\**\*.cs" />
 	</ItemGroup>
 
 </Project>
