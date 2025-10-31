@@ -13,9 +13,9 @@ fi
 echo "📦 Restoring NuGet packages..."
 dotnet restore MauiApp1/MauiApp1.csproj
 
-# Build the project
+# Build the project (Android only for now due to iOS simulator issues)
 echo "🔨 Building project..."
-if ! dotnet build MauiApp1/MauiApp1.csproj --configuration Debug --no-restore; then
+if ! dotnet build MauiApp1/MauiApp1.csproj --configuration Debug --no-restore --framework net9.0-android; then
     echo "❌ Build failed. Please fix build errors before committing."
     exit 1
 fi
