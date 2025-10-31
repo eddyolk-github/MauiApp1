@@ -1,0 +1,139 @@
+name: Enhanced MAUI CI/CD
+
+on:
+  push:
+    branches: [ main, develop, 'release/**', 'hotfix/**' ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  DOTNET_VERSION: '9.0.x'
+  PROJECT_PATH: 'MauiApp1/MauiApp1.csproj'
+
+jobs:
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      source-changed: ${{ steps.changes.outputs.source }}
+      tests-changed: ${{ steps.changes.outputs.tests }}
+      docs-changed: ${{ steps.changes.outputs.docs }}
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dorny/paths-filter@v2
+      id: changes
+      with:
+        filters: |
+          source:
+            - 'MauiApp1/**/*.cs'
+            - 'MauiApp1/**/*.xaml'
+            - 'MauiApp1/**/*.csproj'
+          tests:
+            - 'MauiApp1/Tests/**'
+          docs:
+            - '**/*.md'
+            - 'docs/**'
+
+  test:
+    name: Run Tests
+    needs: detect-changes
+    if: needs.detect-changes.outputs.source-changed == 'true' || needs.detect-changes.outputs.tests-changed == 'true'
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+        
+    - name: Install MAUI Workload
+      run: dotnet workload install maui
+      
+    - name: Restore
+      run: dotnet restore ${{ env.PROJECT_PATH }}
+      
+    - name: Build
+      run: dotnet build ${{ env.PROJECT_PATH }} --no-restore
+      
+    - name: Test
+      run: dotnet test ${{ env.PROJECT_PATH }} --no-build --verbosity normal --collect:"XPlat Code Coverage"
+      
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        files: '**/coverage.cobertura.xml'
+        fail_ci_if_error: false
+
+  build-matrix:
+    name: Build ${{ matrix.platform }}
+    needs: [detect-changes, test]
+    if: needs.detect-changes.outputs.source-changed == 'true'
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        platform: [android, ios, maccatalyst]
+        
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+        
+    - name: Install MAUI Workload
+      run: dotnet workload install maui
+      
+    - name: Restore
+      run: dotnet restore ${{ env.PROJECT_PATH }}
+      
+    - name: Build ${{ matrix.platform }}
+      run: |
+        if [ "${{ matrix.platform }}" == "android" ]; then
+          dotnet publish ${{ env.PROJECT_PATH }} -f net9.0-android -c Release
+        elif [ "${{ matrix.platform }}" == "ios" ]; then
+          dotnet build ${{ env.PROJECT_PATH }} -f net9.0-ios -c Release
+        else
+          dotnet publish ${{ env.PROJECT_PATH }} -f net9.0-maccatalyst -c Release
+        fi
+        
+    - name: Upload ${{ matrix.platform }} artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.platform }}-build
+        path: |
+          **/bin/Release/net9.0-${{ matrix.platform }}/**
+        retention-days: 7
+
+  deploy:
+    name: Deploy to ${{ matrix.environment }}
+    needs: build-matrix
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+    strategy:
+      matrix:
+        environment: 
+          - ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
+    environment: ${{ matrix.environment }}
+    
+    steps:
+    - name: Download artifacts
+      uses: actions/download-artifact@v4
+      
+    - name: Deploy to ${{ matrix.environment }}
+      run: |
+        echo "🚀 Deploying to ${{ matrix.environment }}"
+        if [ "${{ matrix.environment }}" == "production" ]; then
+          echo "📱 Production deployment would happen here"
+          echo "- Upload to Google Play Store"
+          echo "- Upload to Apple App Store"
+          echo "- Create GitHub Release"
+        else
+          echo "🧪 Staging deployment would happen here"
+          echo "- Deploy to Firebase App Distribution"
+          echo "- Notify QA team"
+        fi
